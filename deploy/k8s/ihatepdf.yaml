@@ -1,0 +1,52 @@
+# Kubernetes example for the scaled-out mode. Expects a reachable MariaDB
+# (max_allowed_packet above the largest PDF, e.g. 256M) and Valkey (managed
+# services or your own charts) and a Secret holding the DSN:
+#   kubectl create secret generic ihatepdf \
+#     --from-literal=db-dsn='ihatepdf:PASSWORD@tcp(mariadb:3306)/ihatepdf?charset=utf8mb4'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ihatepdf
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: ihatepdf }
+  template:
+    metadata:
+      labels: { app: ihatepdf }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: ihatepdf
+          image: ihatepdf:latest
+          ports:
+            - containerPort: 8081
+          env:
+            - { name: IHATEPDF_DB_DRIVER, value: mariadb }
+            - name: IHATEPDF_DB_DSN
+              valueFrom: { secretKeyRef: { name: ihatepdf, key: db-dsn } }
+            - { name: IHATEPDF_CACHE_URL, value: "redis://valkey:6379/0" }
+            - { name: IHATEPDF_PROXY_HEADER, value: X-Forwarded-For }
+            - { name: IHATEPDF_COOKIE_SECURE, value: "true" }
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8081 }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8081 }
+          resources:
+            requests: { cpu: 50m, memory: 48Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ihatepdf
+spec:
+  selector: { app: ihatepdf }
+  ports:
+    - port: 80
+      targetPort: 8081

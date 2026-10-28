@@ -1,0 +1,69 @@
+# Scaled-out stack: N stateless app replicas behind nginx, MariaDB as the
+# shared database (sessions and "My files") and Valkey as the shared cache.
+#   docker compose -f compose.scale.yaml up -d --build
+#   docker compose -f compose.scale.yaml up -d --scale ihatepdf=5   (then: docker compose -f compose.scale.yaml restart lb)
+name: ihatepdf-scale
+services:
+  mariadb:
+    image: mariadb:11
+    restart: unless-stopped
+    # PDFs are stored as LONGBLOBs: allow packets larger than the biggest file.
+    command: ["--max-allowed-packet=256M"]
+    environment:
+      MARIADB_DATABASE: ihatepdf
+      MARIADB_USER: ihatepdf
+      MARIADB_PASSWORD: "${MARIADB_PASSWORD:-change-me}"
+      MARIADB_ROOT_PASSWORD: "${MARIADB_ROOT_PASSWORD:-change-me-too}"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ihatepdf:
+    build: .
+    image: ihatepdf:latest
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+    environment:
+      IHATEPDF_DB_DRIVER: mariadb
+      IHATEPDF_DB_DSN: "ihatepdf:${MARIADB_PASSWORD:-change-me}@tcp(mariadb:3306)/ihatepdf?charset=utf8mb4"
+      IHATEPDF_CACHE_URL: redis://valkey:6379/0
+      IHATEPDF_PROXY_HEADER: X-Forwarded-For
+      IHATEPDF_ALLOW_SIGNUP: "${IHATEPDF_ALLOW_SIGNUP:-true}"
+      IHATEPDF_SIGNUP_CIDRS: "${IHATEPDF_SIGNUP_CIDRS:-}"
+      IHATEPDF_COOKIE_SECURE: "${IHATEPDF_COOKIE_SECURE:-false}"
+      IHATEPDF_MAX_FILE_MB: "${IHATEPDF_MAX_FILE_MB:-50}"
+      IHATEPDF_QUOTA_MB: "${IHATEPDF_QUOTA_MB:-2048}"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  lb:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${IHATEPDF_PORT:-8081}:80"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      ihatepdf:
+        condition: service_healthy
+
+volumes:
+  mariadb-data:

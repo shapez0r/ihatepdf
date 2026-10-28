@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>ihatepdf — PDF tools</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <script src="theme.js"></script>
+  <script src="i18n.js"></script>
+  <link rel="stylesheet" href="app.css">
+  <script src="vendor/pdf-lib.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <!-- Sign in / sign up -->
+  <main id="auth-view" class="auth" hidden>
+    <div class="auth-card">
+      <div class="brand brand-lg"><img src="favicon.svg" alt="" width="40" height="40"><span>ihatepdf</span></div>
+      <p class="muted" data-i18n="auth.tagline">Merge, split, sign and fill in PDFs — on your own server, right in the browser.</p>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-login" class="tab active" aria-selected="true" data-i18n="auth.signIn">Sign in</button>
+        <button type="button" role="tab" id="tab-signup" class="tab" aria-selected="false" data-i18n="auth.createAccount">Create account</button>
+      </div>
+      <form id="auth-form" novalidate>
+        <label id="name-field" hidden><span data-i18n="auth.displayName">Display name</span>
+          <input name="display_name" autocomplete="nickname" maxlength="100">
+        </label>
+        <label><span data-i18n="auth.email">E-mail</span>
+          <input name="email" type="email" autocomplete="email" required>
+        </label>
+        <label><span data-i18n="auth.password">Password</span>
+          <span class="password-field">
+            <input name="password" id="auth-password" type="password" autocomplete="current-password" minlength="8" maxlength="72" required>
+            <button type="button" class="password-toggle" id="password-toggle" aria-controls="auth-password" aria-pressed="false" aria-label="Show password" title="Show password">
+              <svg class="ico-show" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false" shape-rendering="crispEdges" fill="currentColor"><path d="M5 4h6v1H5zM3 5h2v1H3zM11 5h2v1h-2zM2 6h1v1H2zM13 6h1v1h-1zM1 7h1v2H1zM14 7h1v2h-1zM2 9h1v1H2zM13 9h1v1h-1zM3 10h2v1H3zM11 10h2v1h-2zM5 11h6v1H5zM7 6h2v1H7zM6 7h4v2H6zM7 9h2v1H7z"/></svg>
+              <svg class="ico-hide" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false" shape-rendering="crispEdges" fill="currentColor"><path d="M5 4h6v1H5zM3 5h2v1H3zM11 5h2v1h-2zM2 6h1v1H2zM13 6h1v1h-1zM1 7h1v2H1zM14 7h1v2h-1zM2 9h1v1H2zM13 9h1v1h-1zM3 10h2v1H3zM11 10h2v1h-2zM5 11h6v1H5zM7 6h2v1H7zM6 7h4v2H6zM7 9h2v1H7zM1 1h2v1H1zM2 2h2v1H2zM3 3h2v1H3zM4 4h1v1H4zM5 5h2v1H5zM6 6h1v1H6zM7 7h2v1H7zM9 8h1v1H9zM9 9h2v1H9zM10 10h2v1h-2zM11 11h2v1h-2zM12 12h2v1h-2zM13 13h2v1h-2zM14 14h1v1h-1z"/></svg>
+            </button>
+          </span>
+        </label>
+        <p id="auth-error" class="error" role="alert" hidden></p>
+        <button type="submit" class="btn primary wide" id="auth-submit" data-i18n="auth.signIn">Sign in</button>
+      </form>
+      <p id="signup-disabled" class="muted small" hidden data-i18n="auth.signupDisabled">Account creation is disabled on this server or for your network.</p>
+    </div>
+  </main>
+
+  <!-- Application -->
+  <div id="app-view" class="app" hidden>
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><img src="favicon.svg" alt="" width="28" height="28"><span>ihatepdf</span></div>
+      <nav class="side-section" aria-labelledby="tools-title">
+        <div class="side-head"><h2 id="tools-title" data-i18n="side.tools">Tools</h2></div>
+        <ul id="tool-nav" class="tool-nav"></ul>
+      </nav>
+      <div class="side-section theme-picker">
+        <div class="side-head"><h2 id="theme-title" data-i18n="side.theme">Theme</h2></div>
+        <select id="theme-select" aria-labelledby="theme-title"></select>
+      </div>
+      <div class="side-section lang-picker">
+        <div class="side-head"><h2 id="lang-title" data-i18n="side.language">Language</h2></div>
+        <select id="lang-select" aria-labelledby="lang-title"></select>
+      </div>
+      <div class="side-foot">
+        <span id="me-name" class="muted small"></span>
+        <button type="button" class="btn ghost small" id="logout" data-i18n="side.signOut">Sign out</button>
+      </div>
+    </aside>
+
+    <section class="main">
+      <header class="toolbar">
+        <button type="button" class="icon-btn menu-btn" id="menu-toggle" aria-label="Toggle sidebar" data-i18n-attr="aria-label:tb.toggleSidebar" aria-controls="sidebar" aria-expanded="false">&#9776;</button>
+        <h1 id="view-title"></h1>
+      </header>
+
+      <div class="main-scroll" id="main-scroll">
+        <!-- Home: all tools -->
+        <section id="view-home" class="view" hidden>
+          <div id="home-pending" class="notice" hidden>
+            <span id="home-pending-text"></span>
+            <button type="button" class="btn ghost small" id="home-pending-cancel" data-i18n="common.cancel">Cancel</button>
+          </div>
+          <p class="lead muted" data-i18n="home.lead">Every tool runs right here in your browser. Files stay on your device unless you save them to My files.</p>
+          <ul id="home-grid" class="tool-grid"></ul>
+        </section>
+
+        <!-- My files -->
+        <section id="view-files" class="view" hidden>
+          <div class="files-head">
+            <div class="files-usage-box">
+              <span id="files-usage" class="muted small"></span>
+              <progress id="files-quota-bar" max="100" value="0" hidden></progress>
+            </div>
+            <button type="button" class="btn primary" id="files-upload" data-i18n="files.upload">Upload PDF…</button>
+            <input type="file" id="files-input" accept="application/pdf,.pdf" multiple hidden>
+          </div>
+          <ul id="files-list" class="file-list"></ul>
+        </section>
+
+        <!-- One tool -->
+        <section id="view-tool" class="view" hidden>
+          <div class="tool-head">
+            <span id="tool-ico" class="tool-ico big" aria-hidden="true"></span>
+            <div>
+              <h2 id="tool-title"></h2>
+              <p id="tool-desc" class="muted"></p>
+            </div>
+          </div>
+          <div id="tool-pick" class="dropzone">
+            <button type="button" class="btn primary big" id="tool-select"><span id="tool-pick-label">Select PDF file</span></button>
+            <button type="button" class="btn" id="tool-from-files" data-i18n="input.fromFiles">From My files</button>
+            <span class="muted small drop-hint" data-i18n="input.dropHint">or drop files here</span>
+            <input type="file" id="tool-file" hidden>
+          </div>
+          <ul id="tool-inputs" class="file-list inputs" hidden></ul>
+          <ul id="tool-grid" class="thumb-grid" hidden></ul>
+          <div id="tool-options" class="tool-options" hidden></div>
+          <p id="tool-hint" class="muted small" hidden></p>
+          <p id="tool-error" class="error" role="alert" hidden></p>
+          <button type="button" class="btn primary big" id="tool-run" hidden></button>
+          <div id="tool-result" class="tool-result" aria-live="polite" hidden></div>
+        </section>
+      </div>
+
+      <!-- Page editor: fill in, draw, write, sign -->
+      <section id="view-editor" class="editor" hidden>
+        <div class="ed-toolbar" role="toolbar" aria-label="Editor" data-i18n-attr="aria-label:ed.toolbar">
+          <div class="ed-group">
+            <button type="button" class="btn ghost small" id="ed-close" data-i18n="ed.close">Close</button>
+          </div>
+          <div class="ed-group ed-tools" id="ed-tools">
+            <button type="button" data-ed-tool="select" title="Fill in &amp; select" aria-label="Fill in &amp; select" data-i18n-attr="title:ed.select;aria-label:ed.select"><span aria-hidden="true">➚</span><span class="lbl" data-i18n="ed.selectShort">Fill</span></button>
+            <button type="button" data-ed-tool="pen" title="Pen" aria-label="Pen" data-i18n-attr="title:ed.pen;aria-label:ed.pen"><span aria-hidden="true">✎</span><span class="lbl" data-i18n="ed.pen">Pen</span></button>
+            <button type="button" data-ed-tool="highlighter" title="Highlighter" aria-label="Highlighter" data-i18n-attr="title:ed.highlighter;aria-label:ed.highlighter"><span aria-hidden="true">▮</span><span class="lbl" data-i18n="ed.highlighterShort">Marker</span></button>
+            <button type="button" data-ed-tool="text" title="Text" aria-label="Text" data-i18n-attr="title:ed.text;aria-label:ed.text"><span aria-hidden="true">T</span><span class="lbl" data-i18n="ed.text">Text</span></button>
+            <button type="button" data-ed-tool="signature" title="Signature" aria-label="Signature" data-i18n-attr="title:ed.signature;aria-label:ed.signature"><span aria-hidden="true">✍</span><span class="lbl" data-i18n="ed.signatureShort">Sign</span></button>
+            <button type="button" data-ed-tool="eraser" title="Eraser" aria-label="Eraser" data-i18n-attr="title:ed.eraser;aria-label:ed.eraser"><span aria-hidden="true">⌫</span><span class="lbl" data-i18n="ed.eraser">Eraser</span></button>
+          </div>
+          <div class="ed-group" id="ed-colors"></div>
+          <div class="ed-group" id="ed-sizes"></div>
+          <div class="ed-group">
+            <button type="button" class="icon-btn" id="ed-undo" title="Undo" aria-label="Undo" data-i18n-attr="title:ed.undo;aria-label:ed.undo">↶</button>
+            <button type="button" class="icon-btn" id="ed-redo" title="Redo" aria-label="Redo" data-i18n-attr="title:ed.redo;aria-label:ed.redo">↷</button>
+            <button type="button" class="icon-btn danger" id="ed-delete" title="Delete selected" aria-label="Delete selected" data-i18n-attr="title:ed.delete;aria-label:ed.delete" hidden>✕</button>
+          </div>
+          <div class="ed-group">
+            <button type="button" class="icon-btn" id="ed-zoom-out" title="Zoom out" aria-label="Zoom out" data-i18n-attr="title:ed.zoomOut;aria-label:ed.zoomOut">−</button>
+            <button type="button" class="btn ghost small" id="ed-fit" title="Fit width" data-i18n-attr="title:ed.fit"><span id="ed-zoom-label">100%</span></button>
+            <button type="button" class="icon-btn" id="ed-zoom-in" title="Zoom in" aria-label="Zoom in" data-i18n-attr="title:ed.zoomIn;aria-label:ed.zoomIn">+</button>
+          </div>
+          <div class="ed-group">
+            <button type="button" class="btn ghost small toggle" id="ed-pencil" aria-pressed="false" title="Pencil only: the Apple Pencil draws, fingers scroll" data-i18n-attr="title:ed.pencilHelp"><span data-i18n="ed.pencil">Pencil only</span></button>
+          </div>
+          <div class="ed-group ed-save">
+            <button type="button" class="btn primary small" id="ed-save" data-i18n="ed.save">Save</button>
+          </div>
+        </div>
+        <div class="ed-status"><span id="ed-name" class="ed-name"></span><span id="ed-fields" class="muted small"></span></div>
+        <div class="ed-pages" id="ed-pages"></div>
+        <div id="ed-text-holder" hidden><textarea id="ed-text-editor" class="ed-text-editor" rows="1" spellcheck="true" hidden aria-label="Text note" data-i18n-attr="aria-label:ed.textNote"></textarea></div>
+      </section>
+    </section>
+  </div>
+
+  <!-- Save edited PDF -->
+  <dialog id="save-dialog">
+    <form id="save-form" class="dialog-body">
+      <h2 data-i18n="save.title">Save PDF</h2>
+      <label><span data-i18n="save.name">File name</span><input name="filename" maxlength="200" required></label>
+      <label class="check" id="save-flatten-row" hidden><input type="checkbox" name="flatten"><span data-i18n="save.flatten">Flatten form fields (they can no longer be changed)</span></label>
+      <p class="muted small" data-i18n="save.help">Your notes, drawings and signatures become part of the pages.</p>
+      <p id="save-error" class="error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="submit" class="btn primary" data-i18n="save.download">Download</button>
+        <button type="button" class="btn" id="save-share" data-i18n="save.share">Share…</button>
+        <button type="button" class="btn" id="save-update" data-i18n="save.update">Update in My files</button>
+        <button type="button" class="btn" id="save-library" data-i18n="save.toFiles">Save to My files</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close data-i18n="common.cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Signature -->
+  <dialog id="sig-dialog" class="sig-dialog">
+    <div class="dialog-body">
+      <h2 data-i18n="sig.title">Signature</h2>
+      <div id="sig-saved" class="sig-saved" hidden>
+        <span class="muted small" data-i18n="sig.savedHint">Tap a saved signature to place it:</span>
+        <ul id="sig-saved-list"></ul>
+      </div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab active" id="sig-tab-draw" data-i18n="sig.draw">Draw</button>
+        <button type="button" role="tab" class="tab" id="sig-tab-type" data-i18n="sig.type">Type</button>
+        <button type="button" role="tab" class="tab" id="sig-tab-upload" data-i18n="sig.upload">Image</button>
+      </div>
+      <div id="sig-panel-draw" class="sig-panel">
+        <canvas id="sig-pad" class="sig-pad" aria-label="Signature pad" data-i18n-attr="aria-label:sig.pad"></canvas>
+        <div class="dialog-actions">
+          <button type="button" class="swatch active" data-sig-color="#111111" title="Black" data-i18n-attr="title:sig.black;aria-label:sig.black" aria-label="Black"></button>
+          <button type="button" class="swatch" data-sig-color="#1d4ed8" title="Blue" data-i18n-attr="title:sig.blue;aria-label:sig.blue" aria-label="Blue"></button>
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost small" id="sig-clear" data-i18n="sig.clear">Clear</button>
+        </div>
+      </div>
+      <div id="sig-panel-type" class="sig-panel" hidden>
+        <label><span data-i18n="sig.yourName">Your name</span><input id="sig-name" maxlength="80" autocomplete="name"></label>
+        <canvas id="sig-type-preview" class="sig-pad typed"></canvas>
+        <div class="dialog-actions" id="sig-styles">
+          <button type="button" class="btn ghost small active" data-style="0" data-i18n="sig.style1">Script</button>
+          <button type="button" class="btn ghost small" data-style="1" data-i18n="sig.style2">Hand</button>
+          <button type="button" class="btn ghost small" data-style="2" data-i18n="sig.style3">Classic</button>
+        </div>
+      </div>
+      <div id="sig-panel-upload" class="sig-panel" hidden>
+        <p class="muted small" data-i18n="sig.uploadHelp">A photo or scan of your signature on white paper. The paper becomes transparent.</p>
+        <button type="button" class="btn" id="sig-upload-btn" data-i18n="sig.chooseImage">Choose image…</button>
+        <input type="file" id="sig-file" accept="image/*" hidden>
+        <div id="sig-upload-preview" class="sig-preview"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="sig-remember" checked><span data-i18n="sig.remember">Remember on this device</span></label>
+      <p id="sig-error" class="error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="btn primary" id="sig-add" data-i18n="sig.add">Place signature</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Choose files from My files -->
+  <dialog id="picker-dialog">
+    <div class="dialog-body">
+      <h2 data-i18n="picker.title">From My files</h2>
+      <p id="picker-hint" class="muted small"></p>
+      <ul id="picker-list" class="picker-list"></ul>
+      <p id="picker-error" class="error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="btn primary" id="picker-ok" data-i18n="picker.add">Add</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Text prompt (rename) -->
+  <dialog id="prompt-dialog">
+    <form id="prompt-form" class="dialog-body">
+      <h2 id="prompt-title"></h2>
+      <input name="value" maxlength="200" required>
+      <div class="dialog-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close data-i18n="common.cancel">Cancel</button>
+        <button type="submit" class="btn primary" data-i18n="common.save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="busy" class="busy" hidden role="status" aria-live="polite">
+    <div class="busy-card"><span class="spinner" aria-hidden="true"></span><span id="busy-text">Working…</span></div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

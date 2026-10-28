@@ -1,0 +1,23 @@
+# Single node: one container, SQLite on a volume, in-process cache.
+# Perfect for a laptop or home-lab PC.   docker compose up -d --build
+# Runs next to eurofish: ihatepdf uses port 8081 and its own volume.
+name: ihatepdf
+services:
+  ihatepdf:
+    build: .
+    image: ihatepdf:latest
+    restart: unless-stopped
+    ports:
+      - "${IHATEPDF_PORT:-8081}:8081"
+    environment:
+      IHATEPDF_ALLOW_SIGNUP: "${IHATEPDF_ALLOW_SIGNUP:-true}"
+      IHATEPDF_SIGNUP_CIDRS: "${IHATEPDF_SIGNUP_CIDRS:-}"
+      IHATEPDF_COOKIE_SECURE: "${IHATEPDF_COOKIE_SECURE:-false}"
+      IHATEPDF_SESSION_TTL: "${IHATEPDF_SESSION_TTL:-720h}"
+      IHATEPDF_MAX_FILE_MB: "${IHATEPDF_MAX_FILE_MB:-50}"
+      IHATEPDF_QUOTA_MB: "${IHATEPDF_QUOTA_MB:-2048}"
+    volumes:
+      - ihatepdf-data:/data
+
+volumes:
+  ihatepdf-data:
