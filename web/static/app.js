@@ -140,7 +140,9 @@
     try { data = await res.json(); } catch { /* empty or non-JSON body */ }
     if (!res.ok) {
       if (res.status === 413 && !(data && data.error)) throw new Error(t("files.tooLarge", { max: fmtSize(state.maxFileBytes) }));
-      throw new Error((data && data.error && I18N.serverError(data.error)) || t("common.requestFailed", { status: res.status }));
+      const err = new Error((data && data.error && I18N.serverError(data.error)) || t("common.requestFailed", { status: res.status }));
+      err.status = res.status;
+      throw err;
     }
     return data;
   }
@@ -645,7 +647,7 @@
         const bytes = new Uint8Array(await f.arrayBuffer());
         let pages = 0;
         try { pages = (await loadPdf(bytes)).getPageCount(); } catch (e) { toast(`${f.name}: ${e.message}`); continue; }
-        await apiPdf("POST", `/documents?name=${encodeURIComponent(f.name)}&pages=${pages}`, bytes);
+        try { await saveToFiles(bytes, f.name, pages); } catch (e) { if (e.cancelled) continue; throw e; }
         ok++;
       }
       if (ok) toast(tn("files.uploaded", ok));
@@ -661,7 +663,18 @@
     if (bytes.length > state.maxFileBytes) throw new Error(t("files.tooLarge", { max: fmtSize(state.maxFileBytes) }));
     const q = `name=${encodeURIComponent(name)}&pages=${pages || 0}`;
     if (docId) return apiPdf("PUT", `/documents/${docId}/file?${q}`, bytes);
-    return apiPdf("POST", `/documents?${q}`, bytes);
+    try {
+      return await apiPdf("POST", `/documents?${q}`, bytes);
+    } catch (e) {
+      // 409: a file with this name already exists; ask before overwriting it.
+      if (e.status !== 409) throw e;
+      if (!confirm(t("files.confirmOverwrite", { name }))) {
+        const c = new Error(t("files.notOverwritten"));
+        c.cancelled = true;
+        throw c;
+      }
+      return apiPdf("POST", `/documents?${q}&overwrite=1`, bytes);
+    }
   }
 
   function isPdfFile(f) { return f.type === "application/pdf" || /\.pdf$/i.test(f.name); }

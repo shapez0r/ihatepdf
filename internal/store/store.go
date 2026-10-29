@@ -93,6 +93,22 @@ func (s *Store) UserByID(ctx context.Context, id string) (*User, error) {
 		`SELECT id, email, display_name, password_hash, created_at FROM users WHERE id = ?`, id))
 }
 
+// ResetAll erases every account together with its sessions, linked
+// identities and "My files". The schema itself is kept.
+func (s *Store) ResetAll(ctx context.Context) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, table := range []string{"documents", "sessions", "auth_identities", "users"} {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // ---------- sessions ----------
 
 func (s *Store) CreateSession(ctx context.Context, tokenHash, userID string, expires time.Time) error {
@@ -190,6 +206,18 @@ func (s *Store) DocumentContent(ctx context.Context, ownerID, id string) (*Docum
 		return nil, nil, err
 	}
 	return &d, content, nil
+}
+
+// DocumentByName returns the user's file with exactly this name, if any
+// (the most recently changed one when older duplicates exist).
+func (s *Store) DocumentByName(ctx context.Context, ownerID, name string) (*Document, error) {
+	d, err := scanDocument(s.db.QueryRowContext(ctx,
+		`SELECT `+documentCols+` FROM documents WHERE owner_id = ? AND name = ? ORDER BY updated_at DESC, id LIMIT 1`,
+		ownerID, name))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return d, err
 }
 
 // UsedBytes is the total size of the user's files, not counting exceptID

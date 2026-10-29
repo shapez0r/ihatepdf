@@ -146,8 +146,25 @@ accordingly (`deploy/nginx/nginx.conf` uses 64m).
 
     ihatepdf serve        # default: migrate the database and start the server
     ihatepdf migrate      # only apply database migrations, then exit
+    ihatepdf reset --yes  # erase ALL users, sessions and My files (keeps the schema)
     ihatepdf healthcheck  # exit 0 if the local server answers /healthz
     ihatepdf version
+
+### Erasing all users and files
+
+Stop the server, then run the `reset` command with the same configuration
+(environment) the server uses. It works with SQLite and MariaDB:
+
+    ./bin/ihatepdf reset --yes                                   # binary
+    sudo systemctl stop ihatepdf && \
+      sudo IHATEPDF_DATA_DIR=/var/lib/ihatepdf /usr/local/bin/ihatepdf reset --yes && \
+      sudo systemctl start ihatepdf                                 # systemd install
+    docker compose stop ihatepdf && \
+      docker compose run --rm ihatepdf reset --yes && docker compose start ihatepdf   # Docker
+
+With SQLite you can alternatively stop the server and delete the
+`ihatepdf.db*` files in the data directory (or `docker compose down -v` to drop
+the volume); a fresh, empty database is created on the next start.
 
 ### Development
 

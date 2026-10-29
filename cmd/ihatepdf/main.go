@@ -17,6 +17,7 @@ import (
 	"ihatepdf/internal/config"
 	"ihatepdf/internal/db"
 	"ihatepdf/internal/server"
+	"ihatepdf/internal/store"
 )
 
 // version is set at build time: -ldflags "-X main.version=1.2.3"
@@ -38,12 +39,17 @@ func main() {
 			fmt.Fprintln(os.Stderr, "ihatepdf:", err)
 			os.Exit(1)
 		}
+	case "reset":
+		if err := reset(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "ihatepdf:", err)
+			os.Exit(1)
+		}
 	case "healthcheck":
 		os.Exit(healthcheck())
 	case "version", "--version", "-v":
 		fmt.Println(version)
 	default:
-		fmt.Fprintf(os.Stderr, "usage: ihatepdf [serve|migrate|healthcheck|version]\n")
+		fmt.Fprintf(os.Stderr, "usage: ihatepdf [serve|migrate|reset --yes|healthcheck|version]\n")
 		os.Exit(2)
 	}
 }
@@ -95,6 +101,41 @@ func migrateOnly() error {
 		return err
 	}
 	return database.Close()
+}
+
+// reset erases all users, sessions and My files. It requires --yes so that it
+// cannot be run by accident. Stop the server first.
+func reset(args []string) error {
+	confirmed := false
+	for _, a := range args {
+		if a == "--yes" || a == "-y" {
+			confirmed = true
+		}
+	}
+	if !confirmed {
+		return fmt.Errorf("this deletes ALL users and ALL files; run \"ihatepdf reset --yes\" to confirm")
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	database, err := openDB(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer database.Close()
+	if err := store.New(database).ResetAll(ctx); err != nil {
+		return fmt.Errorf("reset: %w", err)
+	}
+	if database.Dialect == db.SQLite {
+		// Give the freed space back to the file system.
+		if _, err := database.ExecContext(ctx, "VACUUM"); err != nil {
+			return fmt.Errorf("vacuum: %w", err)
+		}
+	}
+	fmt.Println("all users and files were deleted")
+	return nil
 }
 
 func openDB(ctx context.Context, cfg *config.Config) (*db.DB, error) {

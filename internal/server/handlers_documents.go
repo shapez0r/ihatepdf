@@ -95,12 +95,42 @@ func hashHex(b []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// errNameTaken is returned when a file with the same name already exists in
+// My files. The client asks the user and retries with ?overwrite=1.
+func errNameTaken() error {
+	return fiber.NewError(fiber.StatusConflict, "a file with this name already exists")
+}
+
 // createDocument saves an uploaded PDF (raw application/pdf body) to My files.
-// The name is given as ?name=.
+// The name is given as ?name=. If a file with that name already exists the
+// request fails with 409 unless ?overwrite=1 is set, in which case the
+// existing file is replaced in place (no duplicate entry is created).
 func (s *Server) createDocument(c *fiber.Ctx) error {
+	user := currentUser(c)
 	content, pages, err := s.uploadedPDF(c)
 	if err != nil {
 		return err
+	}
+	name := pdfmeta.CleanName(c.Query("name"))
+	existing, err := s.store.DocumentByName(c.UserContext(), user.ID, name)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
+	if existing != nil {
+		if c.Query("overwrite") != "1" {
+			return errNameTaken()
+		}
+		if err := s.checkQuota(c, existing.ID, int64(len(content))); err != nil {
+			return err
+		}
+		existing.Size = int64(len(content))
+		existing.Pages = pages
+		existing.SHA256 = hashHex(content)
+		existing.UpdatedAt = time.Now().Unix()
+		if err := s.store.ReplaceDocument(c.UserContext(), user.ID, existing, content); err != nil {
+			return err
+		}
+		return c.JSON(existing)
 	}
 	if err := s.checkQuota(c, "", int64(len(content))); err != nil {
 		return err
@@ -108,14 +138,14 @@ func (s *Server) createDocument(c *fiber.Ctx) error {
 	now := time.Now().Unix()
 	d := &store.Document{
 		ID:        auth.NewID(),
-		Name:      pdfmeta.CleanName(c.Query("name")),
+		Name:      name,
 		Size:      int64(len(content)),
 		Pages:     pages,
 		SHA256:    hashHex(content),
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	if err := s.store.CreateDocument(c.UserContext(), currentUser(c).ID, d, content); err != nil {
+	if err := s.store.CreateDocument(c.UserContext(), user.ID, d, content); err != nil {
 		return err
 	}
 	return c.Status(fiber.StatusCreated).JSON(d)
@@ -167,6 +197,11 @@ func (s *Server) renameDocument(c *fiber.Ctx) error {
 	}
 	user := currentUser(c)
 	name := pdfmeta.CleanName(in.Name)
+	if other, err := s.store.DocumentByName(c.UserContext(), user.ID, name); err == nil && other.ID != c.Params("id") {
+		return errNameTaken()
+	} else if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
 	now := time.Now().Unix()
 	if err := s.store.RenameDocument(c.UserContext(), user.ID, c.Params("id"), name, now); err != nil {
 		return err
