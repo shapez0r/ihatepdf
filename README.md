@@ -1,6 +1,7 @@
 # ihatepdf
 
-**ihatepdf** is an open-source, self-hosted set of PDF tools: merge, split, organize, sign and fill in PDFs from any browser on
+**ihatepdf** is an open-source, self-hosted set of PDF tools in the spirit of
+ilovepdf.com: merge, split, organize, sign and fill in PDFs from any browser on
 your network — made to work well on an iPad with the Apple Pencil. It is built
 exactly like its sibling app **eurofish** (Go, Fiber, SQLite/MariaDB,
 Valkey, vanilla JS UI embedded in one static binary) and listens on port
