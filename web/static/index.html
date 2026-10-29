@@ -32,12 +32,15 @@
         </label>
         <label><span data-i18n="auth.password">Password</span>
           <span class="password-field">
-            <input name="password" id="auth-password" type="password" autocomplete="current-password" minlength="8" maxlength="72" required>
+            <input name="password" id="auth-password" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" minlength="8" maxlength="72" required>
             <button type="button" class="password-toggle" id="password-toggle" aria-controls="auth-password" aria-pressed="false" aria-label="Show password" title="Show password">
               <svg class="ico-show" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false" shape-rendering="crispEdges" fill="currentColor"><path d="M5 4h6v1H5zM3 5h2v1H3zM11 5h2v1h-2zM2 6h1v1H2zM13 6h1v1h-1zM1 7h1v2H1zM14 7h1v2h-1zM2 9h1v1H2zM13 9h1v1h-1zM3 10h2v1H3zM11 10h2v1h-2zM5 11h6v1H5zM7 6h2v1H7zM6 7h4v2H6zM7 9h2v1H7z"/></svg>
               <svg class="ico-hide" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false" shape-rendering="crispEdges" fill="currentColor"><path d="M5 4h6v1H5zM3 5h2v1H3zM11 5h2v1h-2zM2 6h1v1H2zM13 6h1v1h-1zM1 7h1v2H1zM14 7h1v2h-1zM2 9h1v1H2zM13 9h1v1h-1zM3 10h2v1H3zM11 10h2v1h-2zM5 11h6v1H5zM7 6h2v1H7zM6 7h4v2H6zM7 9h2v1H7zM1 1h2v1H1zM2 2h2v1H2zM3 3h2v1H3zM4 4h1v1H4zM5 5h2v1H5zM6 6h1v1H6zM7 7h2v1H7zM9 8h1v1H9zM9 9h2v1H9zM10 10h2v1h-2zM11 11h2v1h-2zM12 12h2v1h-2zM13 13h2v1h-2zM14 14h1v1h-1z"/></svg>
             </button>
           </span>
+        </label>
+        <label id="confirm-field" hidden><span data-i18n="auth.repeatPassword">Repeat password</span>
+          <input name="password_confirm" id="auth-password-confirm" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" minlength="8" maxlength="72" disabled>
         </label>
         <p id="auth-error" class="error" role="alert" hidden></p>
         <button type="submit" class="btn primary wide" id="auth-submit" data-i18n="auth.signIn">Sign in</button>

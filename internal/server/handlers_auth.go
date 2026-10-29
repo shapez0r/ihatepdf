@@ -18,9 +18,11 @@ import (
 const sessionCacheTTL = time.Minute
 
 type credentials struct {
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	DisplayName string `json:"display_name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	// PasswordConfirm is the "repeat password" value sent on sign-up.
+	PasswordConfirm *string `json:"password_confirm"`
+	DisplayName     string  `json:"display_name"`
 }
 
 func normalizeEmail(raw string) (string, error) {
@@ -54,6 +56,9 @@ func (s *Server) signup(c *fiber.Ctx) error {
 	if utf8.RuneCountInString(name) > 100 {
 		return badRequest("display name is too long")
 	}
+	if in.PasswordConfirm != nil && *in.PasswordConfirm != in.Password {
+		return badRequest("passwords do not match")
+	}
 	hash, err := auth.HashPassword(in.Password)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidPassword) {
@@ -85,7 +90,12 @@ func (s *Server) login(c *fiber.Ctx) error {
 	if err := c.BodyParser(&in); err != nil {
 		return badRequest("invalid JSON body")
 	}
-	email := strings.ToLower(strings.TrimSpace(in.Email))
+	email, err := normalizeEmail(in.Email)
+	if err != nil {
+		// Same response as an unknown account: do not reveal anything.
+		auth.BurnPasswordCheck(in.Password)
+		return fiber.NewError(fiber.StatusUnauthorized, "wrong e-mail or password")
+	}
 	u, err := s.store.UserByEmail(c.UserContext(), email)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return err
