@@ -116,12 +116,12 @@
       opts.headers["Content-Type"] = "application/json";
       opts.body = JSON.stringify(body);
     }
-    return handle(await fetch(`api${path}`, opts), path);
+    return handle(await fetch(`/api${path}`, opts), path);
   }
 
   // Raw PDF upload (POST/PUT with an application/pdf body).
   async function apiPdf(method, path, bytes) {
-    const res = await fetch(`api${path}`, {
+    const res = await fetch(`/api${path}`, {
       method, credentials: "same-origin",
       headers: { "X-Requested-With": "ihatepdf", "Content-Type": "application/pdf" },
       body: new Blob([bytes], { type: "application/pdf" }),
@@ -146,7 +146,7 @@
   }
 
   async function fetchDocumentBytes(id) {
-    const res = await fetch(`api/documents/${encodeURIComponent(id)}/file`, { credentials: "same-origin", headers: { "X-Requested-With": "ihatepdf" } });
+    const res = await fetch(`/api/documents/${encodeURIComponent(id)}/file`, { credentials: "same-origin", headers: { "X-Requested-With": "ihatepdf" } });
     if (!res.ok) await handle(res, "/documents");
     return new Uint8Array(await res.arrayBuffer());
   }

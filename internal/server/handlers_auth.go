@@ -136,7 +136,7 @@ func (s *Server) setCookie(c *fiber.Ctx, value string, expires time.Time) {
 	c.Cookie(&fiber.Cookie{
 		Name:     sessionCookie,
 		Value:    value,
-		Path:     s.cookiePath(),
+		Path:     "/",
 		Expires:  expires,
 		HTTPOnly: true,
 		Secure:   s.cfg.CookieSecure,
@@ -199,13 +199,4 @@ func (s *Server) cacheSession(ctx context.Context, key string, u *store.User, ex
 func currentUser(c *fiber.Ctx) *store.User {
 	u, _ := c.Locals("user").(*store.User)
 	return u
-}
-
-// cookiePath scopes the session cookie to the app's base path, so it is not
-// sent to other apps sharing the same host:port.
-func (s *Server) cookiePath() string {
-	if s.cfg.BasePath != "" {
-		return s.cfg.BasePath + "/"
-	}
-	return "/"
 }

@@ -79,9 +79,6 @@ func New(cfg *config.Config, database *db.DB, c cache.Cache, log *slog.Logger, v
 		Next: func(c *fiber.Ctx) bool { return strings.HasSuffix(c.Path(), "/file") },
 	}))
 	app.Use(securityHeaders)
-	if cfg.BasePath != "" {
-		app.Use(stripBasePath(cfg.BasePath))
-	}
 
 	app.Get("/healthz", s.healthz)
 	app.Get("/readyz", s.readyz)
@@ -120,20 +117,15 @@ func New(cfg *config.Config, database *db.DB, c cache.Cache, log *slog.Logger, v
 	// files are revalidated on every load.
 	ui := web.Static()
 	index := versionedIndex(ui)
-	// "no-transform" stops proxies/CDNs (e.g. a Cloudflare Tunnel with Rocket
-	// Loader, Email Obfuscation or auto-minify enabled) from rewriting the page.
-	// Rocket Loader changes every <script> into a deferred inline loader, which
-	// our CSP (script-src 'self') blocks, so no JS runs and both views stay
-	// hidden: a blank page through the tunnel, while direct LAN access works.
 	serveIndex := func(c *fiber.Ctx) error {
-		c.Set("Cache-Control", "no-cache, no-transform")
+		c.Set("Cache-Control", "no-cache")
 		c.Type("html", "utf-8")
 		return c.Send(index)
 	}
 	app.Get("/", serveIndex)
 	app.Get("/index.html", serveIndex)
 	app.Use("/", func(c *fiber.Ctx) error {
-		c.Set("Cache-Control", "no-cache, no-transform")
+		c.Set("Cache-Control", "no-cache")
 		return c.Next()
 	}, filesystem.New(filesystem.Config{
 		Root:         http.FS(ui),
@@ -205,30 +197,6 @@ func securityHeaders(c *fiber.Ctx) error {
 	c.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self'; "+
 		"script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
 	return c.Next()
-}
-
-// stripBasePath serves the app under a URL prefix (IHATEPDF_BASE_PATH, e.g.
-// "/ihatepdf"): "/ihatepdf/api/me" is routed as "/api/me". "/ihatepdf" is
-// redirected to "/ihatepdf/" so the UI's relative URLs resolve correctly.
-// /healthz and /readyz also stay reachable without the prefix (healthchecks).
-func stripBasePath(base string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		p := c.Path()
-		switch {
-		case p == base:
-			target := base + "/"
-			if q := string(c.Request().URI().QueryString()); q != "" {
-				target += "?" + q
-			}
-			return c.Redirect(target, fiber.StatusMovedPermanently)
-		case strings.HasPrefix(p, base+"/"):
-			c.Path(p[len(base):])
-			return c.Next()
-		case p == "/healthz" || p == "/readyz":
-			return c.Next()
-		}
-		return fiber.NewError(fiber.StatusNotFound, "not found")
-	}
 }
 
 func noStore(c *fiber.Ctx) error {
