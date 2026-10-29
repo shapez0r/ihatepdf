@@ -1535,7 +1535,7 @@
     ed.pages.forEach((p) => ed.observer.observe(p.wrap));
   }
 
-  function layoutPages() {
+  function layoutPages(skipRender) {
     const ed = editor;
     const pagesEl = $("#ed-pages");
     pagesEl.style.setProperty("--scale", String(ed.scale));
@@ -1544,7 +1544,72 @@
       p.wrap.style.height = `${Math.round(p.vp1.height * ed.scale)}px`;
     }
     $("#ed-zoom-label").textContent = `${Math.round(ed.scale * 100)}%`;
+    if (skipRender) return;
     for (const p of ed.pages) if (p.visible) schedulePageRender(p);
+  }
+
+  // ----- two-finger pinch-zoom / pan (iPad, phones) -----
+  // The browser's own pinch is disabled on the pages (touch-action) so that the
+  // PDF is re-rendered at the new zoom instead of being blurrily magnified.
+
+  function pinchInfo(touches) {
+    const a = touches[0], b = touches[1];
+    return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2, d: Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)) };
+  }
+
+  // Aborts a gesture started by the first finger (e.g. an accidental stroke).
+  function cancelActiveGesture() {
+    const act = editor.active;
+    if (!act) return;
+    editor.active = null;
+    if (act.before) editor.items[act.page] = act.before;
+    requestDraw(editor.pages[act.page]);
+  }
+
+  function onPinchStart(e) {
+    if (!editor || state.view !== "editor" || e.touches.length < 2) return;
+    e.preventDefault();
+    cancelActiveGesture();
+    const m = pinchInfo(e.touches);
+    let wrap = document.elementFromPoint(m.x, m.y);
+    wrap = wrap && wrap.closest ? wrap.closest(".ed-page") : null;
+    let p = wrap ? editor.pages[Number(wrap.dataset.index)] : null;
+    if (!p) { // focal point between pages: use the closest one
+      let best = Infinity;
+      for (const q of editor.pages) {
+        const r = q.wrap.getBoundingClientRect();
+        const dist = Math.abs(m.y - Math.min(Math.max(m.y, r.top), r.bottom));
+        if (dist < best) { best = dist; p = q; }
+      }
+    }
+    if (!p) return;
+    const r = p.wrap.getBoundingClientRect();
+    editor.pinch = { page: p, fx: (m.x - r.left) / r.width, fy: (m.y - r.top) / r.height, d: m.d, scale: editor.scale };
+  }
+
+  function onPinchMove(e) {
+    const pz = editor && editor.pinch;
+    if (!pz) return;
+    e.preventDefault();
+    if (e.touches.length < 2) return;
+    const m = pinchInfo(e.touches);
+    const next = Math.min(4, Math.max(0.25, pz.scale * (m.d / pz.d)));
+    if (Math.abs(next - editor.scale) > 0.001) {
+      editor.scale = next;
+      editor.fit = false;
+      layoutPages(true); // cheap: canvases stretch until the gesture ends
+    }
+    // keep the point under the fingers in place (this also pans with two fingers)
+    const pagesEl = $("#ed-pages");
+    const r = pz.page.wrap.getBoundingClientRect();
+    pagesEl.scrollLeft += r.left + pz.fx * r.width - m.x;
+    pagesEl.scrollTop += r.top + pz.fy * r.height - m.y;
+  }
+
+  function onPinchEnd(e) {
+    if (!editor || !editor.pinch || e.touches.length > 0) return;
+    editor.pinch = null;
+    layoutPages(); // re-render sharply at the final zoom
   }
 
   function fitWidth() {
@@ -1997,7 +2062,7 @@
     const p = pageFromTarget(e.target);
     if (!p) return;
     if (e.pointerType === "pen" && !editor.pencilOnly) enablePencilOnly(true);
-    if (editor.active) return; // one gesture at a time (ignore a resting palm)
+    if (editor.active || editor.pinch) return; // one gesture at a time (ignore a resting palm)
     if (!wantsPointer(p, e.pointerType, e.clientX, e.clientY)) return;
     e.preventDefault();
     try { e.target.setPointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -2854,6 +2919,12 @@
     // editor
     const pages = $("#ed-pages");
     pages.addEventListener("touchstart", onTouchStart, { passive: false });
+    pages.addEventListener("touchstart", onPinchStart, { passive: false });
+    pages.addEventListener("touchmove", onPinchMove, { passive: false });
+    pages.addEventListener("touchend", onPinchEnd);
+    pages.addEventListener("touchcancel", onPinchEnd);
+    // iOS Safari: stop the native page zoom over the editor
+    for (const ev of ["gesturestart", "gesturechange", "gestureend"]) pages.addEventListener(ev, (e) => e.preventDefault());
     pages.addEventListener("pointerdown", onPointerDown);
     pages.addEventListener("pointermove", onPointerMove);
     pages.addEventListener("pointerup", onPointerUp);

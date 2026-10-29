@@ -466,10 +466,12 @@ label.check input { width: 1.2rem; height: 1.2rem; flex: 0 0 auto; box-shadow: n
 .ed-status { display: flex; gap: .75rem; align-items: baseline; padding: .3rem .8rem; background: var(--panel-2); border-bottom: 2px solid var(--line); flex-wrap: wrap; }
 .ed-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
 .ed-pages {
-  flex: 1; overflow: auto; min-height: 0; padding: 1.2rem 1rem 4rem; display: flex; flex-direction: column; align-items: center; gap: 1.2rem;
+  flex: 1; overflow: auto; min-height: 0; padding: 1.2rem 1rem 4rem; display: flex; flex-direction: column; align-items: flex-start; gap: 1.2rem;
   -webkit-overflow-scrolling: touch; overscroll-behavior: contain; --scale: 1;
+  touch-action: pan-x pan-y; /* pinch-zoom is handled by the editor (re-renders the PDF sharply) */
 }
-.ed-page { position: relative; flex-shrink: 0; background: #fff; box-shadow: 0 0 0 2px var(--edge), 6px 6px 0 var(--drop); }
+/* margin:auto centers pages that fit, but keeps zoomed-in pages fully scrollable to the left edge */
+.ed-page { position: relative; flex-shrink: 0; margin: 0 auto; background: #fff; box-shadow: 0 0 0 2px var(--edge), 6px 6px 0 var(--drop); }
 .ed-canvas, .ed-ink { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .ed-ink { touch-action: pan-x pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .ed-pages.drawing .ed-ink { cursor: crosshair; }
