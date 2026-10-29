@@ -50,14 +50,14 @@ full-screen app.
     cp .env.example .env        # optional: restrict sign-up to your LAN, etc.
     docker compose up -d --build
 
-Open http://<ip-of-this-machine>:8081 from any device on your home network,
+Open http://<ip-of-this-machine>:8081/ihatepdf from any device on your home network,
 click **Create account**, and start working with PDFs. Data (accounts and My
 files) lives in the `ihatepdf-data` volume (a single SQLite file).
 
 #### Option B — plain binary (Go 1.23+)
 
     make build                  # -> bin/ihatepdf (static, CGO-free)
-    ./bin/ihatepdf              # listens on :8081, stores data in ./data
+    ./bin/ihatepdf              # listens on :8081 (UI at /ihatepdf), stores data in ./data
 
 Install it as a hardened systemd service on any Linux machine or VM:
 
@@ -126,7 +126,7 @@ a single node.
 | Variable | Default | Description |
 |---|---|---|
 | `IHATEPDF_ADDR` | `:8081` | Listen address (all interfaces → reachable from the LAN) |
-| `IHATEPDF_BASE_PATH` | *(empty)* | URL prefix, e.g. `/ihatepdf`, to serve the app at `http://<server>:8080/ihatepdf/` behind a reverse proxy shared with eurofish (see `deploy/nginx/shared-8080.conf`) |
+| `IHATEPDF_BASE_PATH` | `/ihatepdf` | URL prefix (`/` = serve at the root), e.g. `/ihatepdf`, to serve the app at `http://<server>:8080/ihatepdf/` behind a reverse proxy shared with eurofish (see `deploy/nginx/shared-8080.conf`) |
 | `IHATEPDF_DATA_DIR` | `./data` (`/data` in the container) | Directory for the SQLite database |
 | `IHATEPDF_DB_DRIVER` | `sqlite` | `sqlite` or `mariadb` (alias `mysql`) |
 | `IHATEPDF_DB_DSN` | `file:<data dir>/ihatepdf.db` | e.g. `user:pass@tcp(host:3306)/ihatepdf?charset=utf8mb4` for MariaDB |

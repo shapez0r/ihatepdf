@@ -17,10 +17,14 @@ import (
 // :8081 so ihatepdf can run next to eurofish (:8080) on the same machine.
 const DefaultAddr = ":8081"
 
+// DefaultBasePath is the URL prefix when IHATEPDF_BASE_PATH is not set, so the
+// UI is at http://<host>:8081/ihatepdf/. Set IHATEPDF_BASE_PATH=/ to serve at "/".
+const DefaultBasePath = "/ihatepdf"
+
 type Config struct {
 	// BasePath serves the whole app (UI and API) under a URL prefix such as
 	// "/ihatepdf", so it can share one host:port with other apps behind a
-	// reverse proxy. Empty (default) = served at "/".
+	// reverse proxy. Defaults to "/ihatepdf"; empty (IHATEPDF_BASE_PATH=/) = served at "/".
 	BasePath string
 	// Addr is the listen address, e.g. ":8081" (all interfaces, reachable from the LAN).
 	Addr string
@@ -60,7 +64,7 @@ func Load() (*Config, error) {
 		CacheURL:    env("IHATEPDF_CACHE_URL", "memory"),
 		ProxyHeader: env("IHATEPDF_PROXY_HEADER", ""),
 	}
-	bp := strings.TrimRight(env("IHATEPDF_BASE_PATH", ""), "/")
+	bp := strings.TrimRight(env("IHATEPDF_BASE_PATH", DefaultBasePath), "/")
 	if bp != "" && (!strings.HasPrefix(bp, "/") || strings.ContainsAny(bp, "?#* ")) {
 		return nil, fmt.Errorf("IHATEPDF_BASE_PATH must look like /ihatepdf")
 	}
