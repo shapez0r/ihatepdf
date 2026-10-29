@@ -125,6 +125,7 @@ a single node.
 | Variable | Default | Description |
 |---|---|---|
 | `IHATEPDF_ADDR` | `:8081` | Listen address (all interfaces → reachable from the LAN) |
+| `IHATEPDF_BASE_PATH` | *(empty)* | URL prefix, e.g. `/ihatepdf`, to serve the app at `http://<server>:8080/ihatepdf/` behind a reverse proxy shared with eurofish (see `deploy/nginx/shared-8080.conf`) |
 | `IHATEPDF_DATA_DIR` | `./data` (`/data` in the container) | Directory for the SQLite database |
 | `IHATEPDF_DB_DRIVER` | `sqlite` | `sqlite` or `mariadb` (alias `mysql`) |
 | `IHATEPDF_DB_DSN` | `file:<data dir>/ihatepdf.db` | e.g. `user:pass@tcp(host:3306)/ihatepdf?charset=utf8mb4` for MariaDB |
