@@ -120,15 +120,20 @@ func New(cfg *config.Config, database *db.DB, c cache.Cache, log *slog.Logger, v
 	// files are revalidated on every load.
 	ui := web.Static()
 	index := versionedIndex(ui)
+	// "no-transform" stops proxies/CDNs (e.g. a Cloudflare Tunnel with Rocket
+	// Loader, Email Obfuscation or auto-minify enabled) from rewriting the page.
+	// Rocket Loader changes every <script> into a deferred inline loader, which
+	// our CSP (script-src 'self') blocks, so no JS runs and both views stay
+	// hidden: a blank page through the tunnel, while direct LAN access works.
 	serveIndex := func(c *fiber.Ctx) error {
-		c.Set("Cache-Control", "no-cache")
+		c.Set("Cache-Control", "no-cache, no-transform")
 		c.Type("html", "utf-8")
 		return c.Send(index)
 	}
 	app.Get("/", serveIndex)
 	app.Get("/index.html", serveIndex)
 	app.Use("/", func(c *fiber.Ctx) error {
-		c.Set("Cache-Control", "no-cache")
+		c.Set("Cache-Control", "no-cache, no-transform")
 		return c.Next()
 	}, filesystem.New(filesystem.Config{
 		Root:         http.FS(ui),
